@@ -1,0 +1,76 @@
+from telethon import TelegramClient, events
+from telethon.tl import types
+from datetime import datetime, timedelta
+import asyncio
+
+# Configuration
+API_ID = '25305140'
+API_HASH = '6d19044c96341ccb3da294f878df7659'
+SESSION_NAME = 'session_name'
+
+# Cooldown time (5 minutes)
+COOLDOWN_TIME = timedelta(minutes=5)
+
+# Stylish Offline Message with HTML Formatting
+OFFLINE_MESSAGE = """
+🔵✅ <b>I'm Currently Offline!</b> 🔵✅
+
+<i>Thank you for reaching out! I'll respond once I'm back online.</i>
+
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+⏳ <b>Last Online:</b> <code>{}</code>
+▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬
+
+🌐 <b>Status:</b> Verified | 🕒 <b>Response Time:</b> 24 Hours
+"""
+
+# Initialize Telegram Client
+client = TelegramClient(SESSION_NAME, API_ID, API_HASH)
+
+# Dictionary to track last reply time for each user
+last_reply_time = {}
+
+# Event Handler for New Messages
+@client.on(events.NewMessage(incoming=True))
+async def reply_to_messages(event):
+    if event.is_private and not event.out:
+        sender = await event.get_sender()
+        user_id = sender.id
+        current_time = datetime.now()
+
+        # Handle /status command (bypass cooldown)
+        if event.message.message.strip() == "/status":
+            await event.reply("🤖 <b>Bot Status:</b> Online and Running!", parse_mode='html')
+            print(f"Replied to {sender.first_name} with status")
+            return  # Exit after handling command
+
+        # Check cooldown for non-command messages
+        if user_id in last_reply_time and current_time - last_reply_time[user_id] < COOLDOWN_TIME:
+            print(f"Ignored {sender.first_name} (on cooldown)")
+            return
+
+        # Handle offline message for every message (always outputting offline message)
+        if isinstance(sender.status, types.UserStatusOffline):
+            last_online = sender.status.was_online  # datetime object
+        else:
+            last_online = datetime.now()  # current time if online
+
+        formatted_time = last_online.strftime("%Y-%m-%d %H:%M:%S")
+        await event.reply(
+            OFFLINE_MESSAGE.format(formatted_time),
+            parse_mode='html'
+        )
+        print(f"Replied to {sender.first_name}")
+
+        # Update cooldown timer
+        last_reply_time[user_id] = current_time
+
+# Main Function
+async def main():
+    await client.start()
+    print("Bot is running...")
+    await client.run_until_disconnected()
+
+# Run the Bot
+if __name__ == "__main__":
+    asyncio.run(main())
